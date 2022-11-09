@@ -17,7 +17,7 @@ function init() {
 	});
 }
 
-chrome.browserAction.onClicked.addListener(function(tab) {
+chrome.action.onClicked.addListener(function(tab) {
 	let prevTab = tabHistory[currentTabId].prev;
 	if (prevTab.id) { // Check if is dummy start.
 		chrome.tabs.update(prevTab.id, {active: true});
