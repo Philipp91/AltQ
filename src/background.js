@@ -1,7 +1,5 @@
 let tabHistory = {};
 let currentTabId;
-let currentTabJustRemoved = false; // No-use if `defaultTabClosingBehavior`.
-let defaultTabClosingBehavior = true;
 
 function init() {
 	tabHistory[-1] = {id: null}; // Dummy start.
@@ -25,13 +23,6 @@ chrome.action.onClicked.addListener(function(tab) {
 });
 
 chrome.tabs.onActivated.addListener(function(info) {
-	// After current tab is closed, this listener is triggered twice. Chrome
-	// first switches to its default tab. Then, we switch to our last tab which
-	// can be identified with `currentTabId`.
-	if (currentTabJustRemoved) {
-		currentTabJustRemoved = false;
-		return;
-	}
 	if (info.tabId === currentTabId) {
 		return;
 	}
@@ -63,10 +54,6 @@ chrome.tabs.onRemoved.addListener(function(tabId, info) {
 			// Current tab is removed. Switch to the last tab.
 			delete removedTab.prev.next;
 			currentTabId = removedTab.prev.id;
-			if (!defaultTabClosingBehavior && currentTabId) {
-				currentTabJustRemoved = true;
-				chrome.tabs.update(currentTabId, {active: true});
-			}
 		} else {
 			removedTab.prev.next = removedTab.next;
 			removedTab.next.prev = removedTab.prev;
