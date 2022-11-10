@@ -23,6 +23,7 @@
     }
   },
   "permissions": [
+		"storage",
     "activeTab"
   ],
   "icons": {
