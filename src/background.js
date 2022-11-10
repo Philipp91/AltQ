@@ -1,81 +1,33 @@
-let tabHistory = {};
-let currentTabId;
+const tabHistory = [];  // List of tab IDs, last one is the current tab.
+const pushToHistory = (tabId) => tabHistory.push(tabId);
+const removeFromHistory = (tabId) => {  // Does nothing if it doesn't exist.
+	const oldIndex = tabHistory.indexOf(tabId);
+	if (oldIndex > -1) tabHistory.splice(oldIndex, 1);
+};
 
-function init() {
-	tabHistory[-1] = {id: null}; // Dummy start.
-
-	chrome.tabs.query({
-		active: true,
-		lastFocusedWindow: true,
-	}, function(tab) {
-		currentTabId = tab[0].id;
-		tabHistory[currentTabId] = {id: currentTabId, prev: tabHistory[-1]};
-		tabHistory[-1].next = tabHistory[currentTabId];
-		validateHistory();
-	});
-}
-
-chrome.action.onClicked.addListener(function(tab) {
-	let prevTab = tabHistory[currentTabId].prev;
-	if (prevTab.id) { // Check if is dummy start.
-		chrome.tabs.update(prevTab.id, {active: true});
-	}
+// Initially, add the currently active tab to the history.
+chrome.tabs.query({
+	active: true,
+	lastFocusedWindow: true,
+}, (tab) => {
+	pushToHistory(tab[0].id);
 });
 
-chrome.tabs.onActivated.addListener(function(info) {
-	if (info.tabId === currentTabId) {
-		return;
-	}
-
-	let prevTabId = currentTabId || -1; // Might be dummy start.
-	currentTabId = info.tabId;
-
-	if (!tabHistory.hasOwnProperty(currentTabId)) { // Newly visited tab.
-		tabHistory[currentTabId] = {id: currentTabId};
-	}
-	let currentTab = tabHistory[currentTabId];
-	if (currentTab.prev) {
-		currentTab.prev.next = currentTab.next;
-		currentTab.next.prev = currentTab.prev;
-	}
-
-	let prevTab = tabHistory[prevTabId];
-	prevTab.next = currentTab;
-	currentTab.prev = prevTab;
-	delete currentTab.next;
-	validateHistory();
+// Pop newly activated tabs to the back of the history.
+chrome.tabs.onActivated.addListener((info) => {
+	removeFromHistory(info.tabId);
+	pushToHistory(info.tabId);
 });
 
-chrome.tabs.onRemoved.addListener(function(tabId, info) {
-	if (tabHistory.hasOwnProperty(tabId)) { // Visited tab.
-		// Remove tab from `tabHistory`.
-		let removedTab = tabHistory[tabId];
-		if (tabId === currentTabId) {
-			// Current tab is removed. Switch to the last tab.
-			delete removedTab.prev.next;
-			currentTabId = removedTab.prev.id;
-		} else {
-			removedTab.prev.next = removedTab.next;
-			removedTab.next.prev = removedTab.prev;
-		}
-		delete tabHistory[tabId];
-	}
-	validateHistory();
+// Remove closed tabs from the history.
+chrome.tabs.onRemoved.addListener((tabId, info) => {
+	removeFromHistory(tabId);
 });
 
-function validateHistory() {
-	let current = tabHistory[-1];
-	let path = current.id;
-	while (current.next) {
-		if (current.next.prev !== current) {
-			console.error("Broken history!");
-			console.error(currentTabId, tabHistory);
-			return;
-		}
-		current = current.next;
-		path = path + " => " + current.id;
+// When the extension is activated, switch back to the second-to-last entry in
+// the history, which is the tab that was active before the current one.
+chrome.action.onClicked.addListener((tab) => {
+	if (tabHistory.length > 1) {
+		chrome.tabs.update(tabHistory[tabHistory.length - 2], {active: true});
 	}
-	console.debug(path);
-}
-
-init();
+});
